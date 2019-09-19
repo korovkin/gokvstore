@@ -1,2 +1,16 @@
 # gokvstore
-KV store based on Postgres/SQLite (MySQL coming soon)
+
+Key Value stores built with relational DBs: Postgres, SQLite, MySQL (coming soon)
+
+## Builds
+
+[![Build Status](https://travis-ci.org/korovkin/gokvstore.svg)](https://travis-ci.org/korovkin/gokvstore)
+
+## Example
+
+```
+  TBD
+```
+
+
+
