@@ -13,7 +13,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// StorePostgres is a KV store based on Postgres DB
+// StorePostgres is a 'key value' store based on Postgres DB table
 type StorePostgres struct {
 	Db                   *sql.DB
 	Name                 string
@@ -37,168 +37,149 @@ func NewStorePostgres(name string, connection string, db *sql.DB) (*StorePostgre
 
 // NewStorePostgresWithValueType allocates a new instance and connected to the store
 func NewStorePostgresWithValueType(name string, valueType string, connection string, db *sql.DB) (*StorePostgres, error) {
+	var err error
 	now := time.Now()
 	tableName := "kv_" + name
 	defer func() {
 		log.Println("NewStorePostgres: table:", tableName, "dt:", time.Since(now))
 	}()
-	var err error
 	store := StorePostgres{}
 	store.Name = name
 
 	if db == nil {
 		db, err = sql.Open("postgres", connection)
-		gotils.CheckNotFatal(err)
-	}
-	if err != nil {
-		return nil, err
+		gotils.CheckFatal(err)
 	}
 
 	store.Db = db
 
 	_, err = store.Db.Exec(fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (K text primary key, V %s, T text);",
+		`CREATE TABLE IF NOT EXISTS %s 
+			(K text primary key, V %s, T text);`,
 		tableName,
 		valueType,
 	))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	_, err = store.Db.Exec(
 		fmt.Sprintf(
-			"CREATE INDEX IF NOT EXISTS KV_K_%s ON %s (K, T);",
+			`CREATE INDEX IF NOT EXISTS KV_K_%s 
+				ON %s (K, T);`,
 			name,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	_, err = store.Db.Exec(
 		fmt.Sprintf(
-			"CREATE INDEX IF NOT EXISTS KV_T_%s ON %s (T, K);",
+			`CREATE INDEX IF NOT EXISTS KV_T_%s 
+			ON %s (T, K);`,
 			name,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.InsertStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"INSERT INTO %s (K, V, T) VALUES($1, $2, $3) ON CONFLICT (K) DO UPDATE SET V=$2, T=$3",
+			`INSERT INTO %s (K, V, T)
+				VALUES($1, $2, $3) 
+				ON CONFLICT (K) DO UPDATE SET V=$2, T=$3`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.GetStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"SELECT K, V, T FROM %s WHERE K=$1",
+			`SELECT K, V, T FROM %s WHERE K=$1`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.IterateStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"SELECT K, V, T FROM %s WHERE K<=$1 ORDER BY K DESC LIMIT $2",
+			`SELECT K, V, T 
+				FROM %s 
+				WHERE K<=$1 
+				ORDER BY K DESC 
+				LIMIT $2`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.IterateAllStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"SELECT K, V, T FROM %s ORDER BY K",
+			`SELECT K, V, T 
+				FROM %s 
+				ORDER BY K`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.IterateByPrefixASCEQ, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"SELECT K, V, T FROM %s WHERE K >= $1 ORDER BY K ASC LIMIT $2",
+			`SELECT K, V, T 
+				FROM %s 
+				WHERE K >= $1 
+				ORDER BY K ASC 
+				LIMIT $2`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.IterateByPrefixDSCEQ, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"SELECT K, V, T FROM %s WHERE K <= $1 ORDER BY K DESC LIMIT $2",
+			`SELECT K, V, T 
+				FROM %s
+				WHERE K <= $1
+				ORDER BY K DESC
+				LIMIT $2`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.DeleteStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"DELETE FROM %s WHERE K=$1",
+			`DELETE FROM %s
+				WHERE K=$1`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.DeleteStmtTag, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"DELETE FROM %s WHERE T=$1",
+			`DELETE FROM %s
+				WHERE T=$1`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.DeleteStmtTagLT, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"DELETE FROM %s WHERE T<$1",
+			`DELETE FROM %s 
+				WHERE T<$1`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.DeleteAllStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"DELETE FROM %s",
+			`DELETE FROM %s`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
 	store.CountAllStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			"SELECT COUNT(K), MIN(K), MAX(K) FROM %s",
+			`SELECT 
+					COUNT(K)
+					, MIN(K)
+					, MAX(K) 
+				FROM %s`,
 			tableName,
 		))
-	gotils.CheckNotFatal(err)
-	if err != nil {
-		return nil, err
-	}
+	gotils.CheckFatal(err)
 
-	return &store, nil
+	return &store, err
 }
 
 // Close the connection to the store
