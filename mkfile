@@ -2,7 +2,7 @@ all: build
 	
 travis: build
 	
-build:
+build: get
 	go build
 
 get:
