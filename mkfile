@@ -2,7 +2,6 @@ all: build
 	
 travis: build
 	
-
 build:
 	go build
 
