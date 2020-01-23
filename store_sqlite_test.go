@@ -72,7 +72,7 @@ func TestFarmHasCow(t *testing.T) {
 	g.Expect(err).To(BeNil())
 	g.Expect(list).To(BeEquivalentTo([]string{"kkk", "333", "kk", "33", "k", "3"}))
 
-	// Because SQLite doesn't handle case well:
+	// IMPORTANT: Because SQLite doesn't handle case well:
 	list = []string{}
 	err = s.IterateByKeyPrefixDESC(
 		"Z",
