@@ -26,6 +26,16 @@ func TestSqlite(t *testing.T) {
 	g.Expect(err).To(BeNil())
 	defer s.Close()
 
+	{
+		m := map[string]interface{}{
+			"name": "superman",
+		}
+
+		err = s.AddValueAsJSON("superman", "t", m)
+		g.Expect(err).To(BeNil())
+		s.DeleteAll()
+	}
+
 	err = s.AddValueKVT("k", "1", "t")
 	g.Expect(err).To(BeNil())
 	s.AddValueKVT("k", "2", "t")
