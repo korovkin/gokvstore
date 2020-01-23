@@ -7,3 +7,7 @@ build: get
 
 get:
 	go get -v ./...
+
+test:
+	go test -v *_test.go
+

@@ -163,7 +163,7 @@ func NewStorePostgresWithValueType(name string, valueType string, connection str
 
 	store.DeleteAllStmt, err = store.Db.Prepare(
 		fmt.Sprintf(
-			`DELETE FROM %s`,
+			`DELETE FROM %s WHERE True`,
 			tableName,
 		))
 	gotils.CheckFatal(err)

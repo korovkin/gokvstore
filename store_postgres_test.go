@@ -1,7 +1,6 @@
 package gokvstore_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/korovkin/gokvstore"
@@ -9,22 +8,20 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestSqlite(t *testing.T) {
+func TestPQ(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	deleteFile := func(filename string) {
-		// log.Println("=> removing:", filename)
-		os.RemoveAll(filename)
-	}
-	defer func() {
-		deleteFile("kv_test.db")
-	}()
+	s, err := gokvstore.NewStorePostgresWithValueType(
+		"test",
+		"jsonb",
+		"host=localhost user=test password=test dbname=test sslmode=disable",
+		nil)
 
-	deleteFile("kv_test.db")
-
-	s, err := gokvstore.NewStoreSqlite("kv_test", ".")
 	g.Expect(err).To(BeNil())
 	defer s.Close()
+
+	s.DeleteAll()
+	// defer s.DeleteAll()
 
 	err = s.AddValueKVT("k", "1", "t")
 	g.Expect(err).To(BeNil())
@@ -49,7 +46,7 @@ func TestSqlite(t *testing.T) {
 	g.Expect(*v).To(Equal("333"))
 
 	list := []string{}
-	err = s.IterateByKeyPrefixASC(
+	err = s.IterateByKeyPrefixASCEQ(
 		"k",
 		1000,
 		func(k *string, t *string, v *string, stop *bool) {
@@ -60,8 +57,8 @@ func TestSqlite(t *testing.T) {
 	g.Expect(list).To(BeEquivalentTo([]string{"k", "3", "kk", "33", "kkk", "333"}))
 
 	list = []string{}
-	err = s.IterateByKeyPrefixDESC(
-		"zzz",
+	err = s.IterateByKeyPrefixDESCEQ(
+		"z",
 		1000,
 		func(k *string, t *string, v *string, stop *bool) {
 			list = append(list, *k)
@@ -69,4 +66,17 @@ func TestSqlite(t *testing.T) {
 		})
 	g.Expect(err).To(BeNil())
 	g.Expect(list).To(BeEquivalentTo([]string{"kkk", "333", "kk", "33", "k", "3"}))
+
+	list = []string{}
+	err = s.IterateByKeyPrefixDESCEQ(
+		"z",
+		1000,
+		func(k *string, t *string, v *string, stop *bool) {
+			list = append(list, *k)
+			list = append(list, *v)
+
+			*stop = true
+		})
+	g.Expect(err).To(BeNil())
+	g.Expect(list).To(BeEquivalentTo([]string{"kkk", "333"}))
 }
