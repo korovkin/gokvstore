@@ -21,7 +21,6 @@ type StoreSqlite struct {
 	IterateAllStmt     *sql.Stmt `json:"-"`
 	IterateByPrefixASC *sql.Stmt `json:"-"`
 	IterateByPrefixDSC *sql.Stmt `json:"-"`
-	IterateDSCStmt     *sql.Stmt `json:"-"`
 	DeleteStmt         *sql.Stmt `json:"-"`
 	DeleteAllStmt      *sql.Stmt `json:"-"`
 	DeleteStmtTag      *sql.Stmt `json:"-"`
@@ -105,7 +104,8 @@ func NewStoreSqlite(tableName string, folder string) (*StoreSqlite, error) {
 			FROM KV
 			WHERE K >= $1
 			ORDER BY K ASC
-			LIMIT $2`)
+			LIMIT $2
+			COLLATE NOCASE`)
 	gotils.CheckFatal(err)
 
 	store.IterateByPrefixDSC, err = store.Db.Prepare(
@@ -113,7 +113,8 @@ func NewStoreSqlite(tableName string, folder string) (*StoreSqlite, error) {
 			FROM KV
 			WHERE K <= $1
 			ORDER BY K DESC
-			LIMIT $2`)
+			LIMIT $2
+			COLLATE NOCASE`)
 	gotils.CheckFatal(err)
 
 	store.DeleteStmt, err = store.Db.Prepare(
@@ -134,13 +135,6 @@ func NewStoreSqlite(tableName string, folder string) (*StoreSqlite, error) {
 			WHERE T=$1`)
 	gotils.CheckFatal(err)
 
-	store.IterateDSCStmt, err = store.Db.Prepare(
-		`SELECT K, V, T 
-			FROM KV 
-			ORDER BY K 
-			LIMIT ?`)
-	gotils.CheckFatal(err)
-
 	store.CountAllStmt, err = store.Db.Prepare(
 		`SELECT 
 			COUNT(K), 
@@ -157,7 +151,6 @@ func (s *StoreSqlite) Close() {
 	s.InsertStmt.Close()
 	s.GetStmt.Close()
 	s.IterateStmt.Close()
-	s.IterateDSCStmt.Close()
 	s.DeleteStmt.Close()
 	s.DeleteStmtTag.Close()
 	s.DeleteAllStmt.Close()
@@ -173,6 +166,7 @@ func (s *StoreSqlite) Close() {
 func (s *StoreSqlite) CloseAndDelete() {
 	s.Close()
 	log.Println("STORE: Remove:", s.Filename)
+
 	os.RemoveAll(s.Filename)
 }
 
@@ -280,39 +274,6 @@ func (s *StoreSqlite) Transaction(block func()) error {
 	s.currentTransaction = nil
 
 	return err
-}
-
-// IterateValuesAsJSON traverse all the values in the store by key
-func (s *StoreSqlite) IterateValuesAsJSON(
-	block func(k string, v string, stop *bool),
-	numItems int) {
-	var err error
-	var res *sql.Rows
-
-	res, err = s.IterateDSCStmt.Query(numItems)
-	gotils.CheckNotFatal(err)
-
-	if err != nil {
-		return
-	}
-	defer res.Close()
-
-	stop := false
-	for res.Next() {
-		var k string
-		var v string
-		err = res.Scan(&k, &v)
-		gotils.CheckNotFatal(err)
-
-		if err != nil {
-			continue
-		}
-
-		block(k, v, &stop)
-		if stop {
-			break
-		}
-	}
 }
 
 // IterateAll traverse all the items in the store
